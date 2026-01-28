@@ -1,0 +1,92 @@
+<Window x:Class="FawkesWeb.SettingsWindow"
+
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings"
+        Height="640"
+        Width="800"
+        WindowStartupLocation="CenterOwner"
+        Background="#0f172a"
+        Foreground="#e5e7eb">
+    <ScrollViewer>
+        <StackPanel Margin="16">
+            <TextBlock Text="FakewsWeb Settings" FontSize="18" FontWeight="Bold" Margin="0,0,0,16" />
+
+            <GroupBox Header="Networking" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <CheckBox Content="Enforce TOR for all traffic" x:Name="TorEnforce" />
+                    <CheckBox Content="Auto-reconnect TOR on drop" x:Name="TorReconnect" />
+                    <CheckBox Content="Never send Referrer header" x:Name="NoReferrer" IsChecked="True" />
+                    <TextBlock Text="Browser identification string" Margin="0,8,0,4" />
+                    <TextBox x:Name="UserAgent" Text="FakewsWeb/0.1" />
+                    <Button Content="Set to Google browser string" Margin="0,8,0,0" Click="SetGoogleUA_Click" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Privacy &amp; Fingerprinting" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <CheckBox Content="Enable fingerprinting protection" x:Name="FingerprintProtection" />
+                    <CheckBox Content="Stop JS and clear images on window focus loss" x:Name="PauseOnBlur" />
+                    <CheckBox Content="Auto reject cookie banners (all languages)" x:Name="AutoRejectCookies" />
+                    <CheckBox Content="Disable WebGL" x:Name="DisableWebGl" IsChecked="True" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Blocklists" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <TextBlock Text="Blocked websites/domains (strings or regex)" />
+                    <TextBox x:Name="BlockedDomains" AcceptsReturn="True" Height="80" />
+                    <TextBlock Text="Blocked JavaScript functions/snippets (strings or regex)" Margin="0,8,0,0" />
+                    <TextBox x:Name="BlockedJs" AcceptsReturn="True" Height="80" />
+                    <TextBlock Text="Blocked CSS functions (strings or regex)" Margin="0,8,0,0" />
+                    <TextBox x:Name="BlockedCss" AcceptsReturn="True" Height="60" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Cookies" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <TextBlock Text="Allowed cookie domains (supports wildcards)" />
+                    <TextBox x:Name="CookieAllowList" AcceptsReturn="True" Height="80" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="AI Settings" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <TextBlock Text="OpenAI-compatible endpoint URL" />
+                    <TextBox x:Name="AiEndpoint" Text="https://api.example.com/v1/chat/completions" />
+                    <TextBlock Text="API token" Margin="0,8,0,0" />
+                    <PasswordBox x:Name="AiToken" />
+                    <TextBlock Text="Model" Margin="0,8,0,0" />
+                    <TextBox x:Name="AiModel" Text="gpt-4" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Start Page" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <TextBlock Text="RSS feed URLs (one per line)" />
+                    <TextBox x:Name="RssFeeds" AcceptsReturn="True" Height="80" />
+                    <TextBlock Text="Calendar iCal URL" Margin="0,8,0,0" />
+                    <TextBox x:Name="ICalUrl" />
+                    <TextBlock Text="IMAP settings" Margin="0,8,0,0" />
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBox x:Name="ImapServer" Width="200" Margin="0,0,8,0" ToolTip="Server" />
+                        <TextBox x:Name="ImapUser" Width="200" Margin="0,0,8,0" ToolTip="User" />
+                        <PasswordBox x:Name="ImapPassword" Width="200" />
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Media" Margin="0,0,0,12">
+                <StackPanel Margin="8">
+                    <CheckBox Content="Auto-read pages on load" x:Name="AutoRead" />
+                    <CheckBox Content="Enable DRM playback" x:Name="EnableDrm" />
+                </StackPanel>
+            </GroupBox>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                <Button Content="Save" Width="100" Margin="0,0,8,0" Click="Save_Click" />
+                <Button Content="Close" Width="100" Click="Close_Click" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
