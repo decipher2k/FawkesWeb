@@ -23,17 +23,22 @@ namespace FawkesWeb {
                 return document;
             }
 
+            // For DOM building, strip script/style blocks to avoid rendering code as text.
+            var domHtml = Regex.Replace(html, "<script[\\s\\S]*?</script>", string.Empty, RegexOptions.IgnoreCase);
+            domHtml = Regex.Replace(domHtml, "<style[\\s\\S]*?</style>", string.Empty, RegexOptions.IgnoreCase);
+
             var stack = new Stack<HtmlNode>();
             stack.Push(document.Root);
+            var suppressStack = new Stack<string>(); // track script/style to avoid rendering code as text
 
             var tagRegex = new Regex("<(?<end>/)?(?<name>[a-zA-Z0-9#]+)(?<attrs>[^>]*)>", RegexOptions.Compiled);
             int lastIndex = 0;
 
-            foreach (Match match in tagRegex.Matches(html))
+            foreach (Match match in tagRegex.Matches(domHtml))
             {
-                if (match.Index > lastIndex)
+                if (match.Index > lastIndex && suppressStack.Count == 0)
                 {
-                    var textContent = html.Substring(lastIndex, match.Index - lastIndex);
+                    var textContent = domHtml.Substring(lastIndex, match.Index - lastIndex);
                     AddTextNode(stack.Peek(), textContent);
                 }
 
@@ -45,7 +50,11 @@ namespace FawkesWeb {
                 {
                     if (stack.Count > 1)
                     {
-                        stack.Pop();
+                        var closed = stack.Pop();
+                        if (suppressStack.Count > 0 && string.Equals(closed.Tag, suppressStack.Peek(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            suppressStack.Pop();
+                        }
                     }
                 }
                 else
@@ -57,6 +66,10 @@ namespace FawkesWeb {
                     if (!IsSelfClosing(name, attrs))
                     {
                         stack.Push(node);
+                        if (string.Equals(name, "script", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "style", StringComparison.OrdinalIgnoreCase))
+                        {
+                            suppressStack.Push(name);
+                        }
                     }
 
                     if (string.Equals(name, "base", StringComparison.OrdinalIgnoreCase) && node.Attributes.ContainsKey("href"))
@@ -77,20 +90,25 @@ namespace FawkesWeb {
                 lastIndex = match.Index + match.Length;
             }
 
-            if (lastIndex < html.Length)
+            if (lastIndex < domHtml.Length && suppressStack.Count == 0)
             {
-                AddTextNode(stack.Peek(), html.Substring(lastIndex));
+                AddTextNode(stack.Peek(), domHtml.Substring(lastIndex));
             }
 
             return document;
         }
 
-        public RenderTree Layout(HtmlDocument document, CssEngine cssEngine)
+        public RenderTree Layout(HtmlDocument document, CssEngine cssEngine, double viewportWidth = 1200)
         {
             var cascade = cssEngine.Cascade(document);
             var tree = new RenderTree { Root = new RenderNode { Box = new Box { Tag = document.Root?.Tag ?? "root" } } };
             double y = 0;
-            BuildRenderTree(document.Root, tree.Root, ref y, cascade, null);
+            var rootComputed = new Dictionary<string, string>
+            {
+                { "_content-width", viewportWidth.ToString(CultureInfo.InvariantCulture) }
+            };
+
+            BuildRenderTree(document.Root, tree.Root, ref y, cascade, rootComputed);
             return tree;
         }
 
@@ -100,14 +118,25 @@ namespace FawkesWeb {
             Describe(tree.Root, sb, 0);
 
             var bounds = GetBounds(tree.Root);
-            int pixelWidth = Math.Max(1, (int)Math.Ceiling(bounds.Width));
-            int pixelHeight = Math.Max(1, (int)Math.Ceiling(bounds.Height));
+            double minX = Math.Min(0, bounds.X);
+            double minY = Math.Min(0, bounds.Y);
+            const double padding = 32; // extra padding to avoid clipping at edges
+            int pixelWidth = Math.Max(1, (int)Math.Ceiling(bounds.Width - minX + padding));
+            int pixelHeight = Math.Max(1, (int)Math.Ceiling(bounds.Height - minY + padding));
 
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
                 dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(30, 30, 30)), null, new Rect(0, 0, pixelWidth, pixelHeight));
+                if (minX != 0 || minY != 0)
+                {
+                    dc.PushTransform(new TranslateTransform(-minX, -minY));
+                }
                 PaintNode(tree.Root, dc);
+                if (minX != 0 || minY != 0)
+                {
+                    dc.Pop();
+                }
             }
 
             var rtb = new RenderTargetBitmap(pixelWidth, pixelHeight, 96, 96, PixelFormats.Pbgra32);
@@ -1363,6 +1392,13 @@ namespace FawkesWeb {
                 return;
             }
 
+            // Skip non-visual elements
+            if (string.Equals(node.Tag, "script", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(node.Tag, "style", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             var styles = cascade.Styles.ContainsKey(node) ? new Dictionary<string, string>(cascade.Styles[node]) : new Dictionary<string, string>();
             ApplyAttributeSizing(node, styles);
             MergeDefaults(node.Tag, styles);
@@ -1905,8 +1941,13 @@ namespace FawkesWeb {
 
         private void BuildInlineLayout(HtmlNode node, RenderNode renderNode, ref double y, Dictionary<string, string> styles, double paddingLeft, double paddingRight, double paddingTop, double paddingBottom, double borderLeft, double borderRight, double borderTop, double borderBottom, double marginLeft, double marginRight, double marginTop, double marginBottom, double width, double height, string position, string overflow, CssCascadeResult cascade, Dictionary<string, string> parentComputed)
         {
-            double lineHeight = ParseCssLength(styles, "line-height", height);
-            double available = width - paddingLeft - paddingRight - borderLeft - borderRight - marginLeft - marginRight;
+            double fontSize = ParseCssLength(styles, "font-size", 16);
+            double lineHeight = ParseCssLength(styles, "line-height", double.NaN);
+            if (double.IsNaN(lineHeight) || lineHeight <= 0)
+            {
+                lineHeight = Math.Max(fontSize * 1.4, 16); // ensure readable leading
+            }
+            double available = Math.Max(100, width - paddingLeft - paddingRight - borderLeft - borderRight - marginLeft - marginRight);
             double cursorX = marginLeft + borderLeft + paddingLeft;
             double currentLineY = y + marginTop + paddingTop + borderTop;
             double maxLineHeight = lineHeight;
@@ -1927,9 +1968,9 @@ namespace FawkesWeb {
             bool preserve = whiteSpace == "pre";
             bool preserveNewlines = whiteSpace == "pre" || whiteSpace == "pre-wrap" || whiteSpace == "pre-line";
             bool collapseSpaces = whiteSpace == "normal" || whiteSpace == "nowrap" || whiteSpace == "pre-line";
-            bool noWrap = whiteSpace == "nowrap" || whiteSpace == "pre";
+            bool noWrap = whiteSpace == "nowrap";
             bool breakAll = wordBreak == "break-all";
-            bool breakWord = !breakAll && (overflowWrap == "break-word" || wordBreak == "break-word");
+            bool breakWord = !breakAll && (overflowWrap == "break-word" || wordBreak == "break-word" || string.IsNullOrEmpty(overflowWrap));
 
             // Direct text node handling (node itself is #text)
             if (string.Equals(node.Tag, "#text", StringComparison.OrdinalIgnoreCase))

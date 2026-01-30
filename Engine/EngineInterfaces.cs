@@ -5,7 +5,7 @@ namespace FawkesWeb
     public interface IHtmlEngine
     {
         HtmlDocument Parse(string url, string html);
-        RenderTree Layout(HtmlDocument document, CssEngine cssEngine);
+        RenderTree Layout(HtmlDocument document, CssEngine cssEngine, double viewportWidth = 1200);
         RenderResult Paint(RenderTree tree);
     }
 

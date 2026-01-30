@@ -349,59 +349,48 @@ namespace FawkesWeb
                 }
             }
 
-            var renderTree = engine.Layout(document, engine.CssEngine);
+            // process any queued timeouts
+            engine.JsEngine.EventLoop.Tick();
+
+            var renderTree = engine.Layout(document, engine.CssEngine, viewportWidth);
             engine.CssEngine.ApplyTransitions(renderTree.Root, DateTime.UtcNow, document);
             engine.CssEngine.ApplyAnimations(renderTree.Root, DateTime.UtcNow, document);
             var render = engine.Paint(renderTree);
 
             var tab = new TabItem { Header = address };
 
-            var grid = new Grid();
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var stack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
 
             var image = new Image
             {
                 Source = render.Image,
                 Stretch = Stretch.None,
-                Margin = new Thickness(0, 0, 0, 12)
+                Margin = new Thickness(0, 0, 0, 12),
+                HorizontalAlignment = HorizontalAlignment.Left
             };
 
-            var summary = new TextBlock
-            {
-                Text = "Rendered description:\n" + render.Description,
-                Foreground = new SolidColorBrush(Color.FromRgb(229, 231, 235)),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 12)
-            };
+            stack.Children.Add(image);
 
-            var rawView = new TextBox
-            {
-                Text = html,
-                Background = new SolidColorBrush(Color.FromRgb(12, 18, 31)),
-                Foreground = new SolidColorBrush(Color.FromRgb(229, 231, 235)),
-                BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(45, 55, 72)),
-                AcceptsReturn = true,
-                AcceptsTab = true,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
-            };
-
-            Grid.SetRow(image, 0);
-            Grid.SetRow(summary, 1);
-            Grid.SetRow(rawView, 2);
-            grid.Children.Add(image);
-            grid.Children.Add(summary);
-            grid.Children.Add(rawView);
-
-            tab.Content = new Border
+            var border = new Border
             {
                 Background = new SolidColorBrush(Color.FromRgb(17, 24, 39)),
                 Padding = new Thickness(16),
-                Child = grid
+                Child = stack
             };
+
+            var scroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Visible,
+                CanContentScroll = false,
+                Content = border
+            };
+
+            tab.Content = scroll;
 
             BrowserTabs.Items.Add(tab);
 
